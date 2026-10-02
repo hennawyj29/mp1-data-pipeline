@@ -1,18 +1,16 @@
 """
-Data Processing Pipeline - CLI Template
+Data Processing Pipeline
 
 DS 3500 - MP1
-
-Usage:
-    python pipeline.py --input data.csv --output clean.csv
-    python pipeline.py --input data.csv --output results.json --format json --verbose
 """
 
 import argparse
 import logging
 import sys
 from pathlib import Path
+
 from data_loaders import load_data
+from data_processor import process_data, create_cleaning_report
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +22,7 @@ def setup_logging(verbose=False):
 
     logging.basicConfig(
         level=level,
-        format="%(asctime)s %(levelname)-8s %(message)s",
+        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
         datefmt="%H:%M:%S"
     )
 
@@ -39,14 +37,13 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--output", "-o",
+        "--config",
         required=True
     )
 
     parser.add_argument(
-        "--format",
-        choices=["csv", "json"],
-        default="csv"
+        "--output", "-o",
+        required=True
     )
 
     parser.add_argument(
@@ -75,16 +72,38 @@ def main():
 
     logger.debug(
         f"Arguments parsed: input={args.input}, "
-        f"output={args.output}, format={args.format}"
+        f"output={args.output}, config={args.config}"
     )
 
     if not validate_input(args.input):
         sys.exit(1)
 
+    if not validate_input(args.config):
+        sys.exit(1)
+
     try:
         data = load_data(args.input)
+        config = load_data(args.config)
     except ValueError:
         sys.exit(1)
+
+    data_before = data.copy()
+
+    try:
+        cleaned_data = process_data(data, config)
+    except ValueError:
+        sys.exit(1)
+
+    report = create_cleaning_report(data_before, cleaned_data)
+    print(report)
+
+    logger.info(
+        f"Processing complete: {len(data_before)} → {len(cleaned_data)} rows"
+    )
+
+    cleaned_data.to_csv(args.output, index=False)
+
+    logger.info(f"Saved cleaned data to {args.output}")
 
 
 if __name__ == "__main__":
